@@ -43,17 +43,15 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 		// always shut down server after one request is handled
 		defer cancel()
 
-		fmt.Fprintf(w, "Please return to CLI...")
-
 		stderr("Handling request...")
 
 		v, _ := url.ParseQuery(r.URL.RawQuery)
 		code := v.Get("code")
 
 		if code == "" {
-			fmt.Fprintf(w, "Failure! Please return to CLI...")
+			fmt.Fprintf(w, "Failure! Please return to CLI.")
 
-			stderr("OAuth2 failed...")
+			stderr("OAuth2 failed.")
 
 			error_type := v.Get("error")
 			error_desc := v.Get("error_description")
@@ -64,7 +62,7 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 
 		oauthTok, err := cfg.Exchange(ctx, code)
 		if err != nil {
-			stderr("OAuth2 failed...")
+			stderr("OAuth2 failed.")
 			stderr("error = unable to exchange auth code")
 			stderr("error_description = %s", err)
 		}
@@ -73,7 +71,7 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 
 		rawIDToken, ok := oauthTok.Extra("id_token").(string)
 		if !ok {
-			stderr("OAuth2 failed...")
+			stderr("OAuth2 failed.")
 			stderr("error = failed to find id_token claim in OAuth2 token")
 			return
 		}
@@ -82,13 +80,14 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 
 		_, err = vfr.Verify(ctx, rawIDToken)
 		if err != nil {
-			stderr("OIDC failed...")
+			stderr("OIDC failed.")
 			stderr("error = id_token could not be verified")
 			stderr("error_description = %v", err)
 			stderr("id_token = %s", rawIDToken)
 			return
 		}
 
+		fmt.Fprintf(w, "Please return to CLI.")
 	}
 }
 
@@ -139,9 +138,8 @@ func main() {
 		url := cfg.AuthCodeURL("state", oauth2.AccessTypeOffline)
 
 		if noBrowser {
-			stderr("Please open the following URL in a browser...")
-			stderr("")
-			stderr(url)
+			stderr("Please open the following URL in a browser:")
+			stderr("\n%s\n", url)
 		} else {
 			stderr("Opening URL in browser...")
 			open.Run(url)
@@ -158,6 +156,7 @@ func main() {
 			// once context is canceled, shut down the HTTP server
 			<-ctx.Done()
 			srv.Shutdown(ctx)
+			stderr("Done.")
 		}()
 
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -165,7 +164,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		stderr("Success.")
 	}
 
 	root.Execute()
