@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/coreos/go-oidc"
 	"github.com/skratchdot/open-golang/open"
@@ -105,7 +106,7 @@ func main() {
 
 	root.AddCommand(&issue)
 
-	var issuer, clientID, clientSecret string
+	var issuer, clientID, clientSecret, scopesStr string
 	var noBrowser bool
 
 	issue.Flags().StringVarP(&issuer, "issuer", "", "", "OIDC issuer URL")
@@ -115,6 +116,7 @@ func main() {
 	issue.Flags().StringVarP(&clientSecret, "client-secret", "", "", "OIDC client secret")
 	issue.MarkFlagRequired("client-secret")
 	issue.Flags().BoolVarP(&noBrowser, "no-browser", "", false, "Skip opening a browser window automatically.")
+	issue.Flags().StringVarP(&scopesStr, "scopes", "", "openid,profile,email,groups", "OAuth2 scopes to request with token")
 
 	issue.Run = func(cmd *cobra.Command, args []string) {
 		prv, err := oidc.NewProvider(ctx, issuer)
@@ -126,7 +128,7 @@ func main() {
 		cfg := oauth2.Config{
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
-			Scopes:       []string{"openid", "profile"},
+			Scopes:       strings.Split(scopesStr, ","),
 			Endpoint:     prv.Endpoint(),
 			RedirectURL:  "http://localhost:8080/authorization-code/callback",
 		}
