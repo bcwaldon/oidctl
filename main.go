@@ -23,11 +23,19 @@ func init() {
 }
 
 func stdout(msg string, fields ...interface{}) {
-	fmt.Fprintf(os.Stdout, msg+"\n", fields...)
+	if len(fields) == 0 {
+		fmt.Fprint(os.Stdout, msg+"\n")
+	} else {
+		fmt.Fprintf(os.Stdout, msg+"\n", fields...)
+	}
 }
 
 func stderr(msg string, fields ...interface{}) {
-	fmt.Fprintf(os.Stderr, msg+"\n", fields...)
+	if len(fields) == 0 {
+		fmt.Fprint(os.Stderr, msg+"\n")
+	} else {
+		fmt.Fprintf(os.Stderr, msg+"\n", fields...)
+	}
 }
 
 func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifier) http.HandlerFunc {
@@ -37,7 +45,7 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 
 		fmt.Fprintf(w, "Please return to CLI...")
 
-		stdout("Handling request...")
+		stderr("Handling request...")
 
 		v, _ := url.ParseQuery(r.URL.RawQuery)
 		code := v.Get("code")
@@ -54,8 +62,6 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 			return
 		}
 
-		stdout("Received auth code: %s", code)
-
 		oauthTok, err := cfg.Exchange(ctx, code)
 		if err != nil {
 			stderr("OAuth2 failed...")
@@ -63,7 +69,7 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 			stderr("error_description = %s", err)
 		}
 
-		stdout("Received access token: %s", oauthTok.AccessToken)
+		stdout("export ACCESS_TOKEN=%s", oauthTok.AccessToken)
 
 		rawIDToken, ok := oauthTok.Extra("id_token").(string)
 		if !ok {
@@ -72,7 +78,9 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 			return
 		}
 
-		idTok, err := vfr.Verify(ctx, rawIDToken)
+		stdout("export ID_TOKEN=%s", rawIDToken)
+
+		_, err = vfr.Verify(ctx, rawIDToken)
 		if err != nil {
 			stderr("OIDC failed...")
 			stderr("error = id_token could not be verified")
@@ -81,12 +89,6 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 			return
 		}
 
-		stdout("OIDC success...")
-		stdout("subject = %s", idTok.Subject)
-
-		stdout("id_token follows...")
-		stdout("")
-		stdout(rawIDToken)
 	}
 }
 
@@ -105,12 +107,15 @@ func main() {
 	root.AddCommand(&issue)
 
 	var issuer, clientID, clientSecret string
+	var noBrowser bool
+
 	issue.Flags().StringVarP(&issuer, "issuer", "", "", "OIDC issuer URL")
 	issue.MarkFlagRequired("issuer")
 	issue.Flags().StringVarP(&clientID, "client-id", "", "", "OIDC client ID")
 	issue.MarkFlagRequired("client-id")
 	issue.Flags().StringVarP(&clientSecret, "client-secret", "", "", "OIDC client secret")
 	issue.MarkFlagRequired("client-secret")
+	issue.Flags().BoolVarP(&noBrowser, "no-browser", "", false, "Skip opening a browser window automatically.")
 
 	issue.Run = func(cmd *cobra.Command, args []string) {
 		prv, err := oidc.NewProvider(ctx, issuer)
@@ -133,7 +138,14 @@ func main() {
 		// for the scopes specified above.
 		url := cfg.AuthCodeURL("state", oauth2.AccessTypeOffline)
 
-		open.Run(url)
+		if noBrowser {
+			stderr("Please open the following URL in a browser...")
+			stderr("")
+			stderr(url)
+		} else {
+			stderr("Opening URL in browser...")
+			open.Run(url)
+		}
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/authorization-code/callback", handleFunc(ctx, &cfg, vfr))
@@ -152,6 +164,8 @@ func main() {
 			stderr("HTTP server aborted: %v", err)
 			os.Exit(1)
 		}
+
+		stderr("Success.")
 	}
 
 	root.Execute()
