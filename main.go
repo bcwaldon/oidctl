@@ -79,13 +79,23 @@ func handleFunc(ctx context.Context, cfg *oauth2.Config, vfr *oidc.IDTokenVerifi
 
 		stdout("export ID_TOKEN=%s", rawIDToken)
 
-		_, err = vfr.Verify(ctx, rawIDToken)
+		idt, err := vfr.Verify(ctx, rawIDToken)
 		if err != nil {
 			stderr("OIDC failed.")
 			stderr("error = id_token could not be verified")
 			stderr("error_description = %v", err)
 			stderr("id_token = %s", rawIDToken)
 			return
+		}
+
+		var claims struct {
+			Email string `json:"email"`
+		}
+
+		if err := idt.Claims(&claims); err != nil {
+			stderr("Unable to parse email from ID token")
+		} else {
+			stderr("Authenticated as <%s>", claims.Email)
 		}
 
 		fmt.Fprintf(w, "Please return to CLI.")
