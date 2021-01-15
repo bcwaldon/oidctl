@@ -168,7 +168,6 @@ func main() {
 			// once context is canceled, shut down the HTTP server
 			<-ctx.Done()
 			srv.Shutdown(ctx)
-			stderr("Done.")
 		}()
 
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
